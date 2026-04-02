@@ -8,3 +8,4 @@ redis==6.4.0
 aiokafka==0.12.0
 prometheus-client==0.22.1
 python-dotenv==1.1.1
+snowflake-id-toolkit

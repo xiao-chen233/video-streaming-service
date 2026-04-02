@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from app.core.database import SessionLocal
 from app.core.metrics import recording_file_write_latency
+from app.core.snowflake import generate_snowflake_id
 from app.models.record_file import RecordFile
 from app.models.stream import Stream
 
@@ -79,6 +80,7 @@ class SegmentIndexer:
                 if exists:
                     continue
                 row = RecordFile(
+                    id=generate_snowflake_id(),
                     stream_id=stream_id,
                     file_path=str(file_path),
                     start_time=start_time,

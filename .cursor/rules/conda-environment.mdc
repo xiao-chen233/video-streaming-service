@@ -1,0 +1,13 @@
+---
+description: 开发时统一使用 conda environment.yml 环境
+alwaysApply: true
+---
+
+# Conda 开发环境规则
+
+- 开发、调试、运行、测试命令默认在 `environment.yml` 创建的 conda 环境中执行。
+- 如果环境不存在，优先执行：
+  - `conda env create -f environment.yml`
+  - `conda activate recording-service`
+- 新增 Python 依赖时，同时更新 `environment.yml` 与 `requirements.txt`，避免环境漂移。
+- 若发现当前解释器与 `environment.yml` 不一致，应先切换到 conda 环境，再继续修改代码。
