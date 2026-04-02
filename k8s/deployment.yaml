@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recording-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recording-service
+  template:
+    metadata:
+      labels:
+        app: recording-service
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: app
+          image: recording-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: recording-service-config
+          env:
+            - name: DATA_DIR
+              value: /data/recordings
+            - name: DB_URL
+              value: sqlite:////data/recording.db
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: recording-storage
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+      volumes:
+        - name: recording-storage
+          persistentVolumeClaim:
+            claimName: recording-pvc

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: recording-stream
+spec:
+  serviceName: recording-stream
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recording-stream
+  template:
+    metadata:
+      labels:
+        app: recording-stream
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: app
+          image: recording-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: recording-service-config
+          env:
+            - name: DATA_DIR
+              value: /data/recordings
+            - name: DB_URL
+              value: sqlite:////data/recording.db
+            - name: MAX_STREAMS_PER_NODE
+              value: "1"
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: recording-storage
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+  volumeClaimTemplates:
+    - metadata:
+        name: recording-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 100Gi

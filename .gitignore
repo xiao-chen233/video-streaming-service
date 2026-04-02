@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual env
+.venv/
+venv/
+
+# Local runtime files
+.env
+local-data/
+recording.db
+
+# Tooling
+.idea/
+.pycache/
+.codex/
+
+# OS
+.DS_Store
