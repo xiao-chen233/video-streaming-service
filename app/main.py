@@ -5,6 +5,7 @@ import signal
 from fastapi import FastAPI, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
+from app.api.routes_cameras import router as camera_router
 from app.api.routes_streams import router as stream_router
 from app.core.config import get_settings
 from app.core.database import init_db
@@ -23,6 +24,7 @@ setup_logging(settings.log_level, settings.log_json)
 
 app = FastAPI(title=settings.app_name)
 app.include_router(stream_router)
+app.include_router(camera_router)
 app.include_router(ui_router)
 
 

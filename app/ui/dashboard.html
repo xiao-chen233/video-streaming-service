@@ -84,6 +84,10 @@
         padding: 12px 16px 16px;
       }
 
+      .stack {
+        margin-top: 16px;
+      }
+
       .form-row {
         margin-bottom: 10px;
       }
@@ -176,9 +180,20 @@
         font-weight: 700;
       }
 
-      .pill-running { background: #dcfce7; color: var(--ok); }
-      .pill-stopped { background: #fee2e2; color: #b91c1c; }
-      .pill-error { background: #ffedd5; color: var(--warn); }
+      .pill-running {
+        background: #dcfce7;
+        color: var(--ok);
+      }
+
+      .pill-stopped {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+
+      .pill-error {
+        background: #ffedd5;
+        color: var(--warn);
+      }
 
       .mono {
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -223,6 +238,10 @@
               <input id="streamUrl" placeholder="rtsp://..." />
             </div>
             <div class="form-row">
+              <label for="cameraGbCode">Camera GB Code (可选)</label>
+              <input id="cameraGbCode" placeholder="64018117651329340011" />
+            </div>
+            <div class="form-row">
               <label for="outputDir">Output Dir</label>
               <input id="outputDir" placeholder="/data/recordings/camera_01" />
             </div>
@@ -255,6 +274,32 @@
           </div>
         </section>
       </div>
+
+      <section class="card stack">
+        <h2>摄像头列表</h2>
+        <div class="inner">
+          <div class="btns" style="margin-bottom: 10px">
+            <input id="cameraKeyword" placeholder="关键词: 名称/国标编码/排口" style="max-width: 420px" />
+            <input id="cameraMonitoringType" placeholder="监控类型: DISCHARGE_PORT/CEMS_ROOM" style="max-width: 320px" />
+            <button id="cameraSearchBtn" class="muted">查询摄像头</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>摄像头名称</th>
+                <th>国标编码</th>
+                <th>监控类型</th>
+                <th>基层企业</th>
+                <th>排口名称</th>
+                <th>排口编号</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="cameraRows"></tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
     <script>
@@ -262,9 +307,13 @@
 
       const streamIdEl = $("streamId");
       const streamUrlEl = $("streamUrl");
+      const cameraGbCodeEl = $("cameraGbCode");
       const outputDirEl = $("outputDir");
       const rowsEl = $("rows");
+      const cameraRowsEl = $("cameraRows");
       const messageEl = $("message");
+      const cameraKeywordEl = $("cameraKeyword");
+      const cameraMonitoringTypeEl = $("cameraMonitoringType");
 
       function setMessage(msg, isError = false) {
         messageEl.style.color = isError ? "#b91c1c" : "#0f766e";
@@ -282,7 +331,7 @@
           .replaceAll("&", "&amp;")
           .replaceAll("<", "&lt;")
           .replaceAll(">", "&gt;")
-          .replaceAll("\"", "&quot;");
+          .replaceAll('"', "&quot;");
       }
 
       async function fetchJSON(url, options = {}) {
@@ -296,20 +345,17 @@
 
       async function refreshTable() {
         try {
-          const [runtimeList, catalogList] = await Promise.all([
-            fetchJSON("/streams/list"),
-            fetchJSON("/streams/catalog"),
-          ]);
+          const [runtimeList, catalogList] = await Promise.all([fetchJSON("/streams/list"), fetchJSON("/streams/catalog")]);
 
           const runtimeMap = new Map(runtimeList.map((x) => [x.stream_id, x]));
           const merged = catalogList.map((x) => {
             const rt = runtimeMap.get(x.stream_id);
             return {
               stream_id: x.stream_id,
-              status: rt?.status || x.status,
-              alive: rt?.alive ?? false,
-              restarts: rt?.restarts ?? 0,
-              node_id: rt?.node_id || x.node_id,
+              status: (rt && rt.status) || x.status,
+              alive: (rt && rt.alive) || false,
+              restarts: (rt && rt.restarts) || 0,
+              node_id: (rt && rt.node_id) || x.node_id,
               url: x.url,
               output_dir: x.output_dir,
               updated_at: x.updated_at,
@@ -342,6 +388,42 @@
         }
       }
 
+      async function refreshCameras() {
+        try {
+          const params = new URLSearchParams();
+          const keyword = cameraKeywordEl.value.trim();
+          const monitoringType = cameraMonitoringTypeEl.value.trim();
+          if (keyword) params.set("keyword", keyword);
+          if (monitoringType) params.set("monitoring_type", monitoringType);
+          params.set("limit", "200");
+          params.set("offset", "0");
+
+          const data = await fetchJSON(`/cameras?${params.toString()}`);
+          cameraRowsEl.innerHTML = data
+            .map(
+              (c) => `
+                <tr>
+                  <td class="mono">${escapeHtml(c.id)}</td>
+                  <td>${escapeHtml(c.camera_name)}</td>
+                  <td class="mono">${escapeHtml(c.camera_gb_code)}</td>
+                  <td>${escapeHtml(c.monitoring_type)}</td>
+                  <td>${escapeHtml(c.grassroots_enterprises)}</td>
+                  <td>${escapeHtml(c.discharge_port_name)}</td>
+                  <td>${escapeHtml(c.discharge_port_number)}</td>
+                  <td>
+                    <div class="actions">
+                      <button class="primary" data-use-camera="${escapeHtml(c.camera_gb_code || "")}" data-use-stream="${escapeHtml(c.discharge_port_number || c.id)}">带入启动</button>
+                    </div>
+                  </td>
+                </tr>
+              `
+            )
+            .join("");
+        } catch (err) {
+          setMessage(`摄像头查询失败: ${err.message}`, true);
+        }
+      }
+
       async function startStream(payload) {
         return fetchJSON("/streams/start", {
           method: "POST",
@@ -361,14 +443,21 @@
       $("startBtn").addEventListener("click", async () => {
         const stream_id = streamIdEl.value.trim();
         const url = streamUrlEl.value.trim();
+        const camera_gb_code = cameraGbCodeEl.value.trim();
         const output_dir = outputDirEl.value.trim();
 
-        if (!stream_id || !url) {
-          setMessage("请至少填写 Stream ID 和 URL。", true);
+        if (!stream_id || (!url && !camera_gb_code)) {
+          setMessage("请至少填写 Stream ID，并提供 URL 或 Camera GB Code。", true);
           return;
         }
+
         try {
-          const res = await startStream({ stream_id, url, output_dir: output_dir || null });
+          const res = await startStream({
+            stream_id,
+            url: url || null,
+            camera_gb_code: camera_gb_code || null,
+            output_dir: output_dir || null,
+          });
           setMessage(`启动成功: ${res.stream_id} (${res.status})`);
           await refreshTable();
         } catch (err) {
@@ -377,6 +466,7 @@
       });
 
       $("refreshBtn").addEventListener("click", refreshTable);
+      $("cameraSearchBtn").addEventListener("click", refreshCameras);
 
       rowsEl.addEventListener("click", async (event) => {
         const target = event.target;
@@ -412,8 +502,25 @@
         }
       });
 
+      cameraRowsEl.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const gbCode = target.dataset.useCamera;
+        if (!gbCode) return;
+        const useStream = target.dataset.useStream || gbCode;
+
+        streamIdEl.value = useStream;
+        cameraGbCodeEl.value = gbCode;
+        streamUrlEl.value = "";
+        if (!outputDirEl.value.trim()) {
+          outputDirEl.value = `/data/recordings/${useStream}`;
+        }
+        setMessage(`已带入摄像头编码 ${gbCode}，可直接点“启动流”。`);
+      });
+
       refreshTable();
+      refreshCameras();
       setInterval(refreshTable, 5000);
     </script>
   </body>
-  </html>
+</html>

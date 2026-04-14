@@ -28,7 +28,13 @@ async def start_stream(request: Request, payload: StartStreamRequest) -> StreamS
             from app.api.schemas import CommandMessage
 
             await producer.publish(
-                CommandMessage(action="start", stream_id=payload.stream_id, url=payload.url, output=payload.output_dir)
+                CommandMessage(
+                    action="start",
+                    stream_id=payload.stream_id,
+                    url=payload.url,
+                    camera_gb_code=payload.camera_gb_code,
+                    output=payload.output_dir,
+                )
             )
         return await manager.start_stream(payload)
     except Exception as exc:

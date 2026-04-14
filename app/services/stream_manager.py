@@ -17,6 +17,8 @@ from app.core.database import SessionLocal
 from app.core.metrics import recording_active_streams, recording_errors_total, recording_restart_count
 from app.models.record_file import RecordFile
 from app.models.stream import Stream
+from app.services.camera_info_repository import CameraInfoRepository
+from app.services.camera_stream_url_service import CameraStreamUrlService
 from app.services.ffmpeg_recorder import FFmpegRecorder
 from app.workers.redis_lock import RedisLockManager
 
@@ -37,6 +39,9 @@ class StreamStatus(str, Enum):
 @dataclass
 class StreamRuntime:
     recorder: FFmpegRecorder
+    output_dir: str
+    current_url: str
+    camera_gb_code: str | None = None
     status: StreamStatus = StreamStatus.INIT
     restarts: int = 0
     last_error: str | None = None
@@ -46,9 +51,21 @@ class StreamRuntime:
 
 
 class StreamManager:
-    def __init__(self, settings: Settings, redis_lock: RedisLockManager | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        redis_lock: RedisLockManager | None = None,
+        camera_info_repo: CameraInfoRepository | None = None,
+        camera_stream_service: CameraStreamUrlService | None = None,
+    ):
         self.settings = settings
         self.redis_lock = redis_lock
+        self.camera_info_repo = camera_info_repo or CameraInfoRepository()
+        self.camera_stream_service = camera_stream_service or CameraStreamUrlService(
+            api_url=settings.camera_index_api_url,
+            protocol=settings.camera_index_api_protocol,
+            timeout_seconds=settings.camera_index_api_timeout_seconds,
+        )
         self._streams: dict[str, StreamRuntime] = {}
         self._lock = asyncio.Lock()
 
@@ -102,6 +119,30 @@ class StreamManager:
             obj.updated_at = datetime.now(timezone.utc)
             session.commit()
 
+    def _build_recorder(self, stream_id: str, stream_url: str, output_dir: str) -> FFmpegRecorder:
+        return FFmpegRecorder(
+            stream_id=stream_id,
+            stream_url=stream_url,
+            output_dir=output_dir,
+            ffmpeg_path=self.settings.ffmpeg_path,
+            segment_seconds=self.settings.segment_time_seconds,
+        )
+
+    def _resolve_stream_source(self, req: StartStreamRequest) -> tuple[str, str | None]:
+        if req.camera_gb_code:
+            dynamic_url = self.camera_stream_service.fetch_temporary_url(req.camera_gb_code)
+            return dynamic_url, req.camera_gb_code
+        if req.url:
+            return req.url, None
+
+        camera_gb_code = self.camera_info_repo.find_camera_gb_code(req.stream_id)
+        if not camera_gb_code:
+            raise RuntimeError(
+                f"stream source missing: provide url/camera_gb_code or configure mapping in camera table for {req.stream_id}"
+            )
+        dynamic_url = self.camera_stream_service.fetch_temporary_url(camera_gb_code)
+        return dynamic_url, camera_gb_code
+
     async def start_stream(self, req: StartStreamRequest) -> StreamStatusResponse:
         async with self._lock:
             if req.stream_id in self._streams and self._streams[req.stream_id].recorder.is_alive():
@@ -116,20 +157,21 @@ class StreamManager:
                 if not acquired:
                     raise RuntimeError(f"stream lock exists: {req.stream_id}")
 
+            stream_url, camera_gb_code = self._resolve_stream_source(req)
             output_dir = req.output_dir or os.path.join(self.settings.data_dir, req.stream_id)
-            recorder = FFmpegRecorder(
-                stream_id=req.stream_id,
-                stream_url=req.url,
-                output_dir=output_dir,
-                ffmpeg_path=self.settings.ffmpeg_path,
-                segment_seconds=self.settings.segment_time_seconds,
+            recorder = self._build_recorder(req.stream_id, stream_url, output_dir)
+            runtime = self._streams.get(
+                req.stream_id,
+                StreamRuntime(recorder=recorder, output_dir=output_dir, current_url=stream_url),
             )
-            runtime = self._streams.get(req.stream_id, StreamRuntime(recorder=recorder))
             runtime.recorder = recorder
+            runtime.output_dir = output_dir
+            runtime.current_url = stream_url
+            runtime.camera_gb_code = camera_gb_code
             runtime.status = StreamStatus.STARTING
             self._reset_recovery_state(runtime)
             self._streams[req.stream_id] = runtime
-            self._upsert_stream_db(req.stream_id, req.url, output_dir, StreamStatus.STARTING)
+            self._upsert_stream_db(req.stream_id, stream_url, output_dir, StreamStatus.STARTING)
 
             try:
                 recorder.start(startup_probe_seconds=self.settings.ffmpeg_startup_probe_seconds)
@@ -192,6 +234,11 @@ class StreamManager:
             recording_errors_total.labels(stream_id=stream_id, reason=reason).inc()
             try:
                 runtime.recorder.stop()
+                if runtime.camera_gb_code:
+                    refreshed_url = self.camera_stream_service.fetch_temporary_url(runtime.camera_gb_code)
+                    runtime.current_url = refreshed_url
+                    runtime.recorder = self._build_recorder(stream_id, refreshed_url, runtime.output_dir)
+                    self._upsert_stream_db(stream_id, refreshed_url, runtime.output_dir, StreamStatus.RESTARTING)
                 runtime.recorder.start(startup_probe_seconds=self.settings.ffmpeg_startup_probe_seconds)
                 runtime.status = StreamStatus.RUNNING
                 runtime.restarts += 1

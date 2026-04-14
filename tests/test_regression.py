@@ -7,9 +7,10 @@ from fastapi.testclient import TestClient
 
 from app.api.routes_streams import router as stream_router
 from app.api.schemas import StartStreamRequest, StreamStatusResponse
+from app.core.config import Settings
 from app.core.snowflake import generate_snowflake_id
 from app.services.segment_indexer import SegmentIndexer
-from app.services.stream_manager import StreamStatus
+from app.services.stream_manager import StreamManager, StreamStatus
 
 
 # 轻量假实现：用于路由回归测试，避免依赖 FFmpeg/DB/Redis/Kafka 等外部组件。
@@ -167,3 +168,54 @@ def test_stream_routes_error_mapping_to_http_400() -> None:
     resp = client.post("/streams/start", json={"stream_id": "cam-err", "url": "rtsp://example/err"})
     assert resp.status_code == 400
     assert resp.json()["detail"] == "start failed"
+
+
+def test_stream_routes_start_support_camera_gb_code_without_url() -> None:
+    manager = FakeStreamManager()
+    client = _build_test_client(manager)
+
+    start_resp = client.post(
+        "/streams/start",
+        json={"stream_id": "cam-3", "camera_gb_code": "64018117651329340011", "output_dir": "/tmp/cam-3"},
+    )
+    assert start_resp.status_code == 200
+    assert start_resp.json()["status"] == StreamStatus.RUNNING.value
+
+
+class _FakeCameraInfoRepo:
+    def __init__(self, mapping: dict[str, str]):
+        self.mapping = mapping
+
+    def find_camera_gb_code(self, stream_id: str) -> str | None:
+        return self.mapping.get(stream_id)
+
+
+class _FakeCameraStreamService:
+    def fetch_temporary_url(self, camera_gb_code: str) -> str:
+        return f"rtsp://temporary/{camera_gb_code}"
+
+
+def test_stream_manager_resolve_stream_source_from_camera_table() -> None:
+    settings = Settings()
+    manager = StreamManager(
+        settings=settings,
+        redis_lock=None,
+        camera_info_repo=_FakeCameraInfoRepo({"1001": "64018117651329340011"}),
+        camera_stream_service=_FakeCameraStreamService(),
+    )
+    url, gb_code = manager._resolve_stream_source(StartStreamRequest(stream_id="1001"))
+    assert gb_code == "64018117651329340011"
+    assert url == "rtsp://temporary/64018117651329340011"
+
+
+def test_stream_manager_resolve_stream_source_uses_direct_url_first() -> None:
+    settings = Settings()
+    manager = StreamManager(
+        settings=settings,
+        redis_lock=None,
+        camera_info_repo=_FakeCameraInfoRepo({"1001": "64018117651329340011"}),
+        camera_stream_service=_FakeCameraStreamService(),
+    )
+    url, gb_code = manager._resolve_stream_source(StartStreamRequest(stream_id="1001", url="rtsp://manual/url"))
+    assert gb_code is None
+    assert url == "rtsp://manual/url"

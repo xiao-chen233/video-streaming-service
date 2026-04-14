@@ -1,4 +1,30 @@
 services:
+  recording-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+#    image: recording-service:local
+    container_name: recording-service-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_URL: ${APP_DB_URL:-postgresql+psycopg2://recording:recording@postgres:5432/recording}
+      REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379/0}
+      KAFKA_BOOTSTRAP_SERVERS: ${APP_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      DATA_DIR: ${DATA_DIR:-/data/recordings}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./local-data:/data/recordings
+
   postgres:
     image: postgres:16-alpine
     container_name: recording-postgres

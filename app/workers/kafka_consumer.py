@@ -9,7 +9,6 @@ from aiokafka import AIOKafkaConsumer
 from app.api.schemas import CommandMessage, StartStreamRequest
 from app.services.stream_manager import StreamManager
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -66,10 +65,15 @@ class KafkaCommandConsumer:
             logger.warning("invalid command payload: %s, err=%s", payload, exc)
             return
         if cmd.action == "start":
-            if not cmd.url:
-                logger.warning("start command missing url: %s", payload)
+            if not cmd.url and not cmd.camera_gb_code:
+                logger.warning("start command missing both url and camera_gb_code: %s", payload)
                 return
-            req = StartStreamRequest(stream_id=cmd.stream_id, url=cmd.url, output_dir=cmd.output)
+            req = StartStreamRequest(
+                stream_id=cmd.stream_id,
+                url=cmd.url,
+                camera_gb_code=cmd.camera_gb_code,
+                output_dir=cmd.output,
+            )
             await self.manager.start_stream(req)
         elif cmd.action == "stop":
             await self.manager.stop_stream(cmd.stream_id)

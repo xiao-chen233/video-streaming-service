@@ -14,7 +14,8 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expi
 
 
 def init_db() -> None:
-    from app.models.record_file import RecordFile  # noqa: F401
-    from app.models.stream import Stream  # noqa: F401
+    from app.models.record_file import RecordFile
+    from app.models.stream import Stream
 
-    Base.metadata.create_all(bind=engine)
+    Stream.__table__.create(bind=engine, checkfirst=True)
+    RecordFile.__table__.create(bind=engine, checkfirst=True)
