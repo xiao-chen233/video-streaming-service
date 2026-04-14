@@ -26,22 +26,36 @@ class FFmpegRecorder:
     _stop_event: threading.Event = field(default_factory=threading.Event)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
+    def _is_rtsp(self) -> bool:
+        return self.stream_url.lower().startswith(("rtsp://", "rtsps://"))
+
+    def _output_container(self) -> str:
+        # RTMP family defaults to FLV container; other protocols keep MP4 behavior.
+        if self.stream_url.lower().startswith(("rtmp://", "rtmps://")):
+            return "flv"
+        return "mp4"
+
     def _build_command(self) -> list[str]:
         os.makedirs(self.output_dir, exist_ok=True)
-        output_pattern = os.path.join(self.output_dir, "%Y%m%d_%H.mp4")
-        return [
+        output_container = self._output_container()
+        output_pattern = os.path.join(self.output_dir, f"%Y%m%d_%H.{output_container}")
+        command = [
             self.ffmpeg_path,
             "-hide_banner",
             "-loglevel",
             "info",
-            "-rtsp_transport",
-            "tcp",
+        ]
+        if self._is_rtsp():
+            command.extend(["-rtsp_transport", "tcp"])
+        command.extend([
             "-i",
             self.stream_url,
             "-c",
             "copy",
             "-f",
             "segment",
+            "-segment_format",
+            output_container,
             "-segment_time",
             str(self.segment_seconds),
             "-segment_atclocktime",
@@ -50,8 +64,11 @@ class FFmpegRecorder:
             "1",
             "-reset_timestamps",
             "1",
-            "-movflags",
-            "+faststart",
+        ])
+        if output_container == "mp4":
+            # faststart is MP4-specific and should not be applied to FLV muxing.
+            command.extend(["-movflags", "+faststart"])
+        command.extend([
             "-reconnect",
             "1",
             "-reconnect_streamed",
@@ -59,7 +76,8 @@ class FFmpegRecorder:
             "-reconnect_delay_max",
             "2",
             output_pattern,
-        ]
+        ])
+        return command
 
     def start(self, startup_probe_seconds: int = 0) -> None:
         with self._lock:

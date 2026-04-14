@@ -7,7 +7,7 @@ from app.core.database import Base
 
 
 class Stream(Base):
-    __tablename__ = "stream"
+    __tablename__ = "t_lk_monitor_stream"
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)

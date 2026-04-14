@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     circuit_breaker_cooldown_seconds: NonNegativeInt = 120
     ffmpeg_startup_probe_seconds: NonNegativeInt = 2
     camera_index_api_url: str = "http://eom.chnenergy.com.cn/wfjt/video/getIndexCode"
-    camera_index_api_protocol: str = "rtsp"
+    camera_index_api_protocol: str = "rtmp"
     camera_index_api_timeout_seconds: NonNegativeInt = 6
 
     db_url: str = "postgresql+psycopg2://recording:recording@localhost:5432/recording"

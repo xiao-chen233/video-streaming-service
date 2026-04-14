@@ -377,6 +377,7 @@
                     <div class="actions">
                       <button class="primary" data-start="${escapeHtml(s.stream_id)}">启动</button>
                       <button class="danger" data-stop="${escapeHtml(s.stream_id)}">停止</button>
+                      <button class="muted" data-delete="${escapeHtml(s.stream_id)}">删除</button>
                     </div>
                   </td>
                 </tr>
@@ -440,6 +441,13 @@
         });
       }
 
+      async function deleteStream(streamId, purgeFiles = false) {
+        const params = new URLSearchParams({ purge_files: String(purgeFiles) });
+        return fetchJSON(`/streams/${encodeURIComponent(streamId)}?${params.toString()}`, {
+          method: "DELETE",
+        });
+      }
+
       $("startBtn").addEventListener("click", async () => {
         const stream_id = streamIdEl.value.trim();
         const url = streamUrlEl.value.trim();
@@ -473,6 +481,7 @@
         if (!(target instanceof HTMLElement)) return;
         const startId = target.dataset.start;
         const stopId = target.dataset.stop;
+        const deleteId = target.dataset.delete;
 
         if (startId) {
           try {
@@ -498,6 +507,18 @@
             await refreshTable();
           } catch (err) {
             setMessage(`停止失败: ${err.message}`, true);
+          }
+        }
+
+        if (deleteId) {
+          try {
+            const ok = window.confirm(`确认删除流 ${deleteId} 吗？默认不会删除已录制文件。`);
+            if (!ok) return;
+            const res = await deleteStream(deleteId, false);
+            setMessage(`删除成功: ${res.message}`);
+            await refreshTable();
+          } catch (err) {
+            setMessage(`删除失败: ${err.message}`, true);
           }
         }
       });

@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class SegmentIndexer:
+    SUPPORTED_SUFFIXES = {".mp4", ".flv"}
+
     def __init__(self, data_dir: str, interval_seconds: int):
         self.data_dir = Path(data_dir)
         self.interval_seconds = interval_seconds
@@ -55,44 +57,49 @@ class SegmentIndexer:
         with SessionLocal() as session:
             known_stream_ids = set(session.scalars(select(Stream.id)).all())
 
-        for file_path in self.data_dir.rglob("*.mp4"):
-            stream_id = file_path.parent.name
-            if stream_id not in known_stream_ids:
-                key = f"{stream_id}:{str(file_path)}"
-                if key not in self._unknown_stream_logged:
-                    logger.warning(
-                        "skip indexing file without stream metadata: stream_id=%s file=%s",
-                        stream_id,
-                        str(file_path),
-                    )
-                    self._unknown_stream_logged.add(key)
-                continue
-            parsed = self._parse_time(file_path.name)
-            if parsed is None:
-                continue
-            start_time, end_time = parsed
-            file_size = file_path.stat().st_size
-
-            with SessionLocal() as session:
-                exists = session.scalar(
-                    select(RecordFile.id).where(RecordFile.stream_id == stream_id, RecordFile.file_path == str(file_path))
-                )
-                if exists:
+        patterns = ("*.mp4", "*.flv")
+        for pattern in patterns:
+            for file_path in self.data_dir.rglob(pattern):
+                stream_id = file_path.parent.name
+                if stream_id not in known_stream_ids:
+                    key = f"{stream_id}:{str(file_path)}"
+                    if key not in self._unknown_stream_logged:
+                        logger.warning(
+                            "skip indexing file without stream metadata: stream_id=%s file=%s",
+                            stream_id,
+                            str(file_path),
+                        )
+                        self._unknown_stream_logged.add(key)
                     continue
-                row = RecordFile(
-                    id=generate_snowflake_id(),
-                    stream_id=stream_id,
-                    file_path=str(file_path),
-                    start_time=start_time,
-                    end_time=end_time,
-                    size=file_size,
-                )
-                session.add(row)
-                session.commit()
+                parsed = self._parse_time(file_path.name)
+                if parsed is None:
+                    continue
+                start_time, end_time = parsed
+                file_size = file_path.stat().st_size
+
+                with SessionLocal() as session:
+                    exists = session.scalar(
+                        select(RecordFile.id).where(RecordFile.stream_id == stream_id, RecordFile.file_path == str(file_path))
+                    )
+                    if exists:
+                        continue
+                    row = RecordFile(
+                        id=generate_snowflake_id(),
+                        stream_id=stream_id,
+                        file_path=str(file_path),
+                        start_time=start_time,
+                        end_time=end_time,
+                        size=file_size,
+                    )
+                    session.add(row)
+                    session.commit()
 
     @staticmethod
     def _parse_time(filename: str) -> tuple[datetime, datetime] | None:
-        base = filename.replace(".mp4", "")
+        path = Path(filename)
+        if path.suffix.lower() not in SegmentIndexer.SUPPORTED_SUFFIXES:
+            return None
+        base = path.stem
         try:
             dt = datetime.strptime(base, "%Y%m%d_%H").replace(tzinfo=timezone.utc)
         except ValueError:

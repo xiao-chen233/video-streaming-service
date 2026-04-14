@@ -7,11 +7,11 @@ from app.core.database import Base
 
 
 class RecordFile(Base):
-    __tablename__ = "record_file"
+    __tablename__ = "t_lk_monitor_record_file"
     __table_args__ = (UniqueConstraint("stream_id", "file_path", name="uq_stream_file"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    stream_id: Mapped[str] = mapped_column(ForeignKey("stream.id"), nullable=False, index=True)
+    stream_id: Mapped[str] = mapped_column(ForeignKey("t_lk_monitor_stream.id"), nullable=False, index=True)
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

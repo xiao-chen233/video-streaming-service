@@ -104,7 +104,10 @@ def test_segment_indexer_parse_time() -> None:
     start_time, end_time = parsed
     assert start_time == datetime(2026, 1, 1, 15, 0, tzinfo=timezone.utc)
     assert end_time - start_time == timedelta(hours=1)
+    parsed_flv = SegmentIndexer._parse_time("20260101_16.flv")
+    assert parsed_flv is not None
     assert SegmentIndexer._parse_time("bad_name.mp4") is None
+    assert SegmentIndexer._parse_time("20260101_16.ts") is None
 
 
 def test_stream_routes_start_stop_delete_and_list() -> None:

@@ -7,7 +7,7 @@ from urllib.request import Request, urlopen
 
 
 class CameraStreamUrlService:
-    def __init__(self, api_url: str, protocol: str = "rtsp", timeout_seconds: int = 6):
+    def __init__(self, api_url: str, protocol: str = "rtmp", timeout_seconds: int = 6):
         self.api_url = api_url
         self.protocol = protocol
         self.timeout_seconds = timeout_seconds

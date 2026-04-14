@@ -10,7 +10,7 @@ Production-oriented recording service based on persistent FFmpeg workers, stream
 - Stream lifecycle state machine
 - Auto restart on process crash / no-output timeout
 - Retry limit + exponential backoff + circuit breaker (`CIRCUIT_OPEN`)
-- Hourly segment output (`segment_atclocktime=1`)
+- Hourly segment output (`segment_atclocktime=1`, auto container by protocol)
 - REST API for start/stop/status/list + batch operations
 - Segment indexer writes file metadata into DB
 - Optional distributed control via Kafka topic `recording.commands`
@@ -99,7 +99,12 @@ curl -X POST http://127.0.0.1:8000/streams/start \
 
 ## Required FFmpeg Arguments
 
-The recorder uses:
+The recorder adapts by protocol:
+
+- RTSP/RTSPS input: force `-rtsp_transport tcp`, segment output as `mp4`
+- RTMP/RTMPS input: no RTSP transport flags, segment output as `flv`
+
+RTSP example:
 
 ```bash
 ffmpeg \
@@ -111,11 +116,30 @@ ffmpeg \
  -segment_atclocktime 1 \
  -strftime 1 \
  -reset_timestamps 1 \
+ -segment_format mp4 \
  -movflags +faststart \
  -reconnect 1 \
  -reconnect_streamed 1 \
  -reconnect_delay_max 2 \
  output/%Y%m%d_%H.mp4
+```
+
+RTMP example:
+
+```bash
+ffmpeg \
+ -i <stream_url> \
+ -c copy \
+ -f segment \
+ -segment_format flv \
+ -segment_time 3600 \
+ -segment_atclocktime 1 \
+ -strftime 1 \
+ -reset_timestamps 1 \
+ -reconnect 1 \
+ -reconnect_streamed 1 \
+ -reconnect_delay_max 2 \
+ output/%Y%m%d_%H.flv
 ```
 
 ## Kubernetes

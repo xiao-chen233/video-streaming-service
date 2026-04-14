@@ -8,7 +8,7 @@
 - 流状态机管理（`INIT/STARTING/RUNNING/ERROR/RESTARTING/CIRCUIT_OPEN/STOPPED`）
 - 进程异常与无输出自动恢复
 - 重试上限 + 指数退避 + 熔断冷却（`CIRCUIT_OPEN`）
-- 按小时切片 MP4（`segment_atclocktime=1`）
+- 按小时切片（`segment_atclocktime=1`，按协议自动选择封装）
 - REST API：启动 / 停止 / 删除 / 状态 / 列表 / 批量操作
 - 分片索引器自动扫描文件并写入数据库
 - Kafka 分布式控制（`recording.commands`）
@@ -106,12 +106,20 @@ curl -X DELETE "http://127.0.0.1:8000/streams/camera_1?purge_files=true"
 
 ## FFmpeg 参数（当前实现）
 
+按输入协议自适应：
+
+- RTSP/RTSPS：强制 `-rtsp_transport tcp`，切片输出 `mp4`
+- RTMP/RTMPS：不添加 RTSP 专属参数，切片输出 `flv`
+
+RTSP 示例：
+
 ```bash
 ffmpeg \
  -rtsp_transport tcp \
  -i <stream_url> \
  -c copy \
  -f segment \
+ -segment_format mp4 \
  -segment_time 3600 \
  -segment_atclocktime 1 \
  -strftime 1 \
@@ -121,6 +129,24 @@ ffmpeg \
  -reconnect_streamed 1 \
  -reconnect_delay_max 2 \
  output/%Y%m%d_%H.mp4
+```
+
+RTMP 示例：
+
+```bash
+ffmpeg \
+ -i <stream_url> \
+ -c copy \
+ -f segment \
+ -segment_format flv \
+ -segment_time 3600 \
+ -segment_atclocktime 1 \
+ -strftime 1 \
+ -reset_timestamps 1 \
+ -reconnect 1 \
+ -reconnect_streamed 1 \
+ -reconnect_delay_max 2 \
+ output/%Y%m%d_%H.flv
 ```
 
 ## 重试 / 退避 / 熔断策略

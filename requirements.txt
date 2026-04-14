@@ -4,6 +4,8 @@ pydantic==2.11.7
 pydantic-settings==2.10.1
 sqlalchemy==2.0.43
 psycopg2-binary==2.9.10
+dmsqlalchemy==2.0.11
+dmpython==2.5.32
 redis==6.4.0
 aiokafka==0.12.0
 prometheus-client==0.22.1
