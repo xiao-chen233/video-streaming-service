@@ -121,7 +121,7 @@ ffmpeg \
  -reconnect 1 \
  -reconnect_streamed 1 \
  -reconnect_delay_max 2 \
- output/%Y%m%d_%H.mp4
+ output/%Y%m%d_%H%M%S.mp4
 ```
 
 RTMP example:
@@ -139,7 +139,7 @@ ffmpeg \
  -reconnect 1 \
  -reconnect_streamed 1 \
  -reconnect_delay_max 2 \
- output/%Y%m%d_%H.flv
+ output/%Y%m%d_%H%M%S.flv
 ```
 
 ## Kubernetes
@@ -153,6 +153,7 @@ ffmpeg \
 
 - PostgreSQL is the default database for local and production-style setup.
 - Use `REDIS_URL` and `KAFKA_ENABLED=true` to enable distributed control.
+- Container timezone defaults to `Asia/Shanghai` (`UTC+8`) via `TZ`.
 
 ## Recovery Strategy
 

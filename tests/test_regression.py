@@ -99,13 +99,16 @@ def test_snowflake_id_unique_and_ordered() -> None:
 
 def test_segment_indexer_parse_time() -> None:
     # 回归目标：文件名时间解析正确，且非法文件名不会误入库。
-    parsed = SegmentIndexer._parse_time("20260101_15.mp4")
+    parsed = SegmentIndexer._parse_time("20260101_150000.mp4")
     assert parsed is not None
     start_time, end_time = parsed
-    assert start_time == datetime(2026, 1, 1, 15, 0, tzinfo=timezone.utc)
+    expected_local = datetime(2026, 1, 1, 15, 0, 0, tzinfo=SegmentIndexer._local_tzinfo())
+    assert start_time == expected_local
     assert end_time - start_time == timedelta(hours=1)
-    parsed_flv = SegmentIndexer._parse_time("20260101_16.flv")
+    parsed_flv = SegmentIndexer._parse_time("20260101_160001.flv")
     assert parsed_flv is not None
+    # 兼容历史文件名（仅到小时）。
+    assert SegmentIndexer._parse_time("20260101_16.flv") is not None
     assert SegmentIndexer._parse_time("bad_name.mp4") is None
     assert SegmentIndexer._parse_time("20260101_16.ts") is None
 

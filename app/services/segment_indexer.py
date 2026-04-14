@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 class SegmentIndexer:
     SUPPORTED_SUFFIXES = {".mp4", ".flv"}
 
+    @staticmethod
+    def _local_tzinfo() -> timezone:
+        local_tz = datetime.now().astimezone().tzinfo
+        return local_tz if local_tz is not None else timezone.utc
+
     def __init__(self, data_dir: str, interval_seconds: int):
         self.data_dir = Path(data_dir)
         self.interval_seconds = interval_seconds
@@ -100,8 +105,16 @@ class SegmentIndexer:
         if path.suffix.lower() not in SegmentIndexer.SUPPORTED_SUFFIXES:
             return None
         base = path.stem
-        try:
-            dt = datetime.strptime(base, "%Y%m%d_%H").replace(tzinfo=timezone.utc)
-        except ValueError:
+        parsed: datetime | None = None
+        for fmt in ("%Y%m%d_%H%M%S", "%Y%m%d_%H"):
+            try:
+                parsed = datetime.strptime(base, fmt)
+                break
+            except ValueError:
+                continue
+        if parsed is None:
             return None
-        return dt, dt + timedelta(hours=1)
+
+        # Filename timestamp follows container local timezone (default UTC+8).
+        start_local = parsed.replace(tzinfo=SegmentIndexer._local_tzinfo())
+        return start_local, start_local + timedelta(hours=1)

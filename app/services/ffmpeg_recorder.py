@@ -38,7 +38,7 @@ class FFmpegRecorder:
     def _build_command(self) -> list[str]:
         os.makedirs(self.output_dir, exist_ok=True)
         output_container = self._output_container()
-        output_pattern = os.path.join(self.output_dir, f"%Y%m%d_%H.{output_container}")
+        output_pattern = os.path.join(self.output_dir, f"%Y%m%d_%H%M%S.{output_container}")
         command = [
             self.ffmpeg_path,
             "-hide_banner",

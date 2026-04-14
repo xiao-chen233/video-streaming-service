@@ -20,6 +20,7 @@ services:
       REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379/0}
       KAFKA_BOOTSTRAP_SERVERS: ${APP_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       DATA_DIR: ${DATA_DIR:-/data/recordings}
+      TZ: ${TZ:-Asia/Shanghai}
     ports:
       - "8000:8000"
     volumes:

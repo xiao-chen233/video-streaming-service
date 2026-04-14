@@ -128,7 +128,7 @@ ffmpeg \
  -reconnect 1 \
  -reconnect_streamed 1 \
  -reconnect_delay_max 2 \
- output/%Y%m%d_%H.mp4
+ output/%Y%m%d_%H%M%S.mp4
 ```
 
 RTMP 示例：
@@ -146,7 +146,7 @@ ffmpeg \
  -reconnect 1 \
  -reconnect_streamed 1 \
  -reconnect_delay_max 2 \
- output/%Y%m%d_%H.flv
+ output/%Y%m%d_%H%M%S.flv
 ```
 
 ## 重试 / 退避 / 熔断策略
@@ -174,6 +174,7 @@ ffmpeg \
 ## 说明
 
 - 当前默认数据库为 PostgreSQL。
+- 容器默认时区为 `Asia/Shanghai`（`UTC+8`），通过 `TZ` 配置。
 - 若启用分布式控制，请配置：
   - `REDIS_URL`
   - `KAFKA_ENABLED=true`
