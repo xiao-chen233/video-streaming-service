@@ -15,7 +15,7 @@ class RecordFile(Base):
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

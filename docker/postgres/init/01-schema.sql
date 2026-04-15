@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS t_lk_monitor_record_file (
   file_path TEXT NOT NULL,
   start_time TIMESTAMP NOT NULL,
   end_time TIMESTAMP NOT NULL,
-  size BIGINT NOT NULL,
+  file_size BIGINT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_stream_file UNIQUE (stream_id, file_path)
 );

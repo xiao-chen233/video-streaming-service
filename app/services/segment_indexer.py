@@ -94,7 +94,7 @@ class SegmentIndexer:
                         file_path=str(file_path),
                         start_time=start_time,
                         end_time=end_time,
-                        size=file_size,
+                        file_size=file_size,
                     )
                     session.add(row)
                     session.commit()
