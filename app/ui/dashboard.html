@@ -234,8 +234,8 @@
               <input id="streamId" placeholder="camera_01" />
             </div>
             <div class="form-row">
-              <label for="streamUrl">RTSP URL</label>
-              <input id="streamUrl" placeholder="rtsp://..." />
+              <label for="streamUrl">RTSP/RTMP URL</label>
+              <input id="streamUrl" placeholder="rtsp://... 或 rtmp://..." />
             </div>
             <div class="form-row">
               <label for="cameraGbCode">Camera GB Code (可选)</label>
@@ -528,7 +528,7 @@
         if (!(target instanceof HTMLElement)) return;
         const gbCode = target.dataset.useCamera;
         if (!gbCode) return;
-        const useStream = target.dataset.useStream || gbCode;
+        const useStream = gbCode;
 
         streamIdEl.value = useStream;
         cameraGbCodeEl.value = gbCode;
